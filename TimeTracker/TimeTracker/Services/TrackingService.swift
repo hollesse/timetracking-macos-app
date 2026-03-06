@@ -17,8 +17,6 @@ class TrackingService {
     private var currentDomain: String?   // non-nil only when a tracked browser is frontmost
     private var currentEntryStart: Date?
 
-    private let minimumDuration: TimeInterval = 2.0
-
     // MARK: - Public API
 
     func start() {
@@ -85,8 +83,6 @@ class TrackingService {
 
     private func finalizeCurrentEntry(at endTime: Date) {
         guard let app = currentApp, let start = currentEntryStart else { return }
-        let duration = endTime.timeIntervalSince(start)
-        guard duration >= minimumDuration else { return }
 
         let entry = TrackingEntry(
             startTime: start,
