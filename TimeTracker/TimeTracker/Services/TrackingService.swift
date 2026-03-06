@@ -17,8 +17,6 @@ class TrackingService {
     private var currentDomain: String?   // non-nil only when a tracked browser is frontmost
     private var currentEntryStart: Date?
 
-    private let minimumDuration: TimeInterval = 2.0
-
     // MARK: - Public API
 
     func start() {
@@ -73,12 +71,8 @@ class TrackingService {
             $0.localizedName == appName
         }) else { return }
 
-        // Only treat as a domain change if we successfully read a domain.
-        // A nil result (e.g. during page load or AX tree not yet ready) must not
-        // reset currentEntryStart — otherwise the entry gets split into sub-2s
-        // fragments that are silently discarded by the minimum-duration filter.
-        guard let newDomain = fetchBrowserDomain(for: runningApp),
-              newDomain != currentDomain else { return }
+        let newDomain = fetchBrowserDomain(for: runningApp)
+        guard newDomain != currentDomain else { return }
 
         let now = Date()
         finalizeCurrentEntry(at: now)
@@ -89,8 +83,6 @@ class TrackingService {
 
     private func finalizeCurrentEntry(at endTime: Date) {
         guard let app = currentApp, let start = currentEntryStart else { return }
-        let duration = endTime.timeIntervalSince(start)
-        guard duration >= minimumDuration else { return }
 
         let entry = TrackingEntry(
             startTime: start,
