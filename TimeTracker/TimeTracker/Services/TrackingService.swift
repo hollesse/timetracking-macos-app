@@ -17,6 +17,9 @@ class TrackingService {
     private var currentDomain: String?   // non-nil only when a tracked browser is frontmost
     private var currentEntryStart: Date?
 
+    // Prevents overlapping async domain lookups
+    private var isDomainChecking = false
+
     // MARK: - Public API
 
     func start() {
@@ -25,8 +28,11 @@ class TrackingService {
             let appName = frontmost.localizedName ?? "Unknown"
             currentApp = appName
             currentEntryStart = Date()
-            currentDomain = isTrackedBrowser(appName) ? fetchBrowserDomain(for: frontmost) : nil
-            onCurrentAppChanged?(appName, currentDomain)
+            currentDomain = nil
+            onCurrentAppChanged?(appName, nil)
+            if isTrackedBrowser(appName) {
+                fetchDomainAsync(pid: frontmost.processIdentifier, forApp: appName)
+            }
         }
 
         // React to app switches
@@ -40,9 +46,10 @@ class TrackingService {
             self?.handleAppSwitch(to: app)
         }
 
-        // Poll browser domain every 2 s to catch tab changes
+        // Poll every 2 s: domain changes + fallback app detection
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.checkDomainChange()
+            self?.checkFrontmostApp()
         }
     }
 
@@ -60,25 +67,60 @@ class TrackingService {
         let appName = app.localizedName ?? "Unknown"
         currentApp = appName
         currentEntryStart = now
-        currentDomain = isTrackedBrowser(appName) ? fetchBrowserDomain(for: app) : nil
-        onCurrentAppChanged?(appName, currentDomain)
+        currentDomain = nil
+        onCurrentAppChanged?(appName, nil)
+
+        if isTrackedBrowser(appName) {
+            fetchDomainAsync(pid: app.processIdentifier, forApp: appName)
+        }
+    }
+
+    /// Fallback: catches app switches that the workspace notification may have missed.
+    private func checkFrontmostApp() {
+        guard let frontmost = NSWorkspace.shared.frontmostApplication else { return }
+        let appName = frontmost.localizedName ?? "Unknown"
+        guard appName != currentApp else { return }
+        handleAppSwitch(to: frontmost)
     }
 
     private func checkDomainChange() {
+        guard !isDomainChecking else { return }
         guard let appName = currentApp, isTrackedBrowser(appName) else { return }
 
         guard let runningApp = NSWorkspace.shared.runningApplications.first(where: {
             $0.localizedName == appName
         }) else { return }
 
-        let newDomain = fetchBrowserDomain(for: runningApp)
-        guard newDomain != currentDomain else { return }
+        let pid = runningApp.processIdentifier
+        isDomainChecking = true
 
-        let now = Date()
-        finalizeCurrentEntry(at: now)
-        currentDomain = newDomain
-        currentEntryStart = now
-        onCurrentAppChanged?(appName, newDomain)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            let newDomain = self.fetchBrowserDomain(pid: pid)
+            DispatchQueue.main.async {
+                self.isDomainChecking = false
+                guard self.currentApp == appName, newDomain != self.currentDomain else { return }
+                let now = Date()
+                self.finalizeCurrentEntry(at: now)
+                self.currentDomain = newDomain
+                self.currentEntryStart = now
+                self.onCurrentAppChanged?(appName, newDomain)
+            }
+        }
+    }
+
+    /// Fetches the browser domain on a background thread to avoid blocking the main thread
+    /// (Firefox's AX implementation can take several seconds to respond).
+    private func fetchDomainAsync(pid: pid_t, forApp appName: String) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            let domain = self.fetchBrowserDomain(pid: pid)
+            DispatchQueue.main.async {
+                guard self.currentApp == appName else { return }
+                self.currentDomain = domain
+                self.onCurrentAppChanged?(appName, domain)
+            }
+        }
     }
 
     private func finalizeCurrentEntry(at endTime: Date) {
@@ -113,10 +155,11 @@ class TrackingService {
 
     // MARK: - Domain Reading via Accessibility API
 
-    private func fetchBrowserDomain(for app: NSRunningApplication) -> String? {
+    /// Safe to call from any thread; uses only AX IPC functions (thread-safe).
+    private func fetchBrowserDomain(pid: pid_t) -> String? {
         guard AXIsProcessTrusted() else { return nil }
 
-        let axApp = AXUIElementCreateApplication(app.processIdentifier)
+        let axApp = AXUIElementCreateApplication(pid)
 
         var windowsRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(axApp, "AXWindows" as CFString, &windowsRef) == .success,
