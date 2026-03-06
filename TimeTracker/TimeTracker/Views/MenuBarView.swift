@@ -14,7 +14,9 @@ struct MenuBarView: View {
             Divider()
 
             if !hasAccessibility {
-                OnboardingView()
+                OnboardingView(onPermissionGranted: {
+                    hasAccessibility = true
+                })
             } else if !sessionManager.hasOutputFolder {
                 folderRequiredView
             } else {
