@@ -4,6 +4,8 @@
 
 Eine native macOS-Menubar-App, die auf Knopfdruck aufzeichnet, welche Anwendungen wie lange aktiv waren. Für Firefox wird zusätzlich die Domain des aktiven Tabs erfasst. Die Daten werden als CSV-Datei pro Aufzeichnungszyklus gespeichert.
 
+> **Getroffene Entscheidungen:** Browser-Tracking initial nur für Firefox. Speicherort wird beim ersten App-Start per Ordner-Dialog ausgewählt und kann in den App-Settings geändert werden. App-Wechsel kürzer als 2 Sekunden werden ignoriert.
+
 ---
 
 ## Kernfunktionalität
@@ -47,15 +49,18 @@ Firefox bietet keine vollständige AppleScript-Unterstützung für URLs. Es gibt
 ### CSV-Format
 
 ```
-start_time,end_time,duration_seconds,app_name,firefox_domain
-2025-01-15 09:00:00,2025-01-15 09:04:23,263,Firefox,github.com
-2025-01-15 09:04:23,2025-01-15 09:11:05,402,Xcode,
-2025-01-15 09:11:05,2025-01-15 09:13:00,115,Firefox,stackoverflow.com
+start_time,end_time,duration_seconds,duration_formatted,app_name,web_domain
+2025-01-15 09:00:00,2025-01-15 09:04:23,263,00:04:23,Firefox,github.com
+2025-01-15 09:04:23,2025-01-15 09:11:05,402,00:06:42,Xcode,
+2025-01-15 09:11:05,2025-01-15 09:13:00,115,00:01:55,Firefox,stackoverflow.com
 ```
 
-- `firefox_domain` ist nur befüllt, wenn die aktive App Firefox ist
+- `duration_seconds` — rohe Sekunden für maschinelle Weiterverarbeitung
+- `duration_formatted` — menschenlesbare Darstellung im Format `HH:MM:SS` (z. B. `01:12:05` für 1h 12m 5s)
+- `web_domain` — nur befüllt, wenn die aktive App ein unterstützter Browser (aktuell: Firefox) ist; Feldname ist browser-agnostisch gehalten für spätere Erweiterung
+- App-Wechsel mit einer Dauer < 2 Sekunden werden **nicht** aufgezeichnet
 - Dateiname: `session_YYYY-MM-DD_HH-mm-ss.csv`
-- Speicherort: frei wählbar (z. B. `~/Documents/TimeTracking/`)
+- Speicherort: beim ersten App-Start via Ordner-Dialog festgelegt, änderbar in den App-Settings
 
 ---
 
@@ -104,10 +109,18 @@ Die App greift **nicht** auf persönliche Daten zu – sie liest lediglich den s
 
 ---
 
-## Offene Fragen / Entscheidungspunkte
+## Entscheidungen (getroffen)
 
-1. **Menubar-App oder Dock-App?** — Menubar ist weniger aufdringlich, da sie immer läuft
-2. **Polling-Intervall für Firefox-URL** — Die Accessibility API wird nicht benachrichtigt bei Tab-Wechseln; es muss gepollt werden (z. B. alle 2 Sekunden). Welches Intervall ist sinnvoll?
-3. **Mindeststdauer für Einträge** — Sollen App-Wechsel unter 1 Sekunde ignoriert werden?
-4. **Speicherort der CSV** — Festes Verzeichnis vs. wählbarer Ordner per Dialog
-5. **Chromium-basierte Browser** (Chrome, Edge, Brave) — Gleiches Prinzip wie Firefox; soll das ebenfalls unterstützt werden?
+| Thema | Entscheidung |
+|---|---|
+| Browser-Support | Initial nur Firefox; Feld `web_domain` ist bereits browser-agnostisch benannt |
+| Speicherort | Erster Start: Ordner-Dialog; danach änderbar in den App-Settings |
+| Mindestdauer | App-Wechsel < 2 Sekunden werden verworfen |
+| Dauer-Format | Zwei Spalten: `duration_seconds` (roh) + `duration_formatted` (HH:MM:SS) |
+| App-Typ | Menubar-App (kein Dock-Icon), weniger aufdringlich |
+| Polling-Intervall Firefox | 2 Sekunden (deckt sich mit Mindestdauer-Filter) |
+
+## Offene Fragen
+
+1. **Berechtigungs-Onboarding** — Soll die App beim ersten Start aktiv durch die Accessibility-Berechtigung führen (mit Deep-Link in die Systemeinstellungen)?
+2. **Settings-Fenster** — Reicht ein einfaches Popover im Menubar-Menü, oder soll es ein eigenes Settings-Fenster geben?
