@@ -101,7 +101,7 @@ struct OnboardingView: View {
 
             // Check TCC via prompt-less options call; if macOS already recorded the
             // grant but the process hasn't reloaded yet, the flag flips here.
-            let options = [kAXTrustedCheckOptionPrompt: false] as CFDictionary
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): false] as CFDictionary
             let tccGranted = AXIsProcessTrustedWithOptions(options)
             if tccGranted && !permissionSeenInTCC {
                 await MainActor.run {
