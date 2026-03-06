@@ -19,9 +19,7 @@ class SessionManager: ObservableObject {
 
     init() {
         trackingService.onEntryRecorded = { [weak self] entry in
-            DispatchQueue.main.async {
-                self?.entries.append(entry)
-            }
+            self?.entries.append(entry)
         }
         trackingService.onCurrentAppChanged = { [weak self] appName, domain in
             DispatchQueue.main.async {
