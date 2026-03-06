@@ -114,13 +114,14 @@ Die App greift **nicht** auf persönliche Daten zu – sie liest lediglich den s
 | Thema | Entscheidung |
 |---|---|
 | Browser-Support | Initial nur Firefox; Feld `web_domain` ist bereits browser-agnostisch benannt |
-| Speicherort | Erster Start: Ordner-Dialog; danach änderbar in den App-Settings |
+| Speicherort | Erster Start: Ordner-Dialog; danach änderbar direkt aus dem Menü via `NSOpenPanel` (kein Extra-Fenster nötig) |
 | Mindestdauer | App-Wechsel < 2 Sekunden werden verworfen |
 | Dauer-Format | Zwei Spalten: `duration_seconds` (roh) + `duration_formatted` (HH:MM:SS) |
 | App-Typ | Menubar-App (kein Dock-Icon), weniger aufdringlich |
 | Polling-Intervall Firefox | 2 Sekunden (deckt sich mit Mindestdauer-Filter) |
+| Berechtigungs-Onboarding | Beim ersten Start: Hinweis-Popover mit Button, der direkt in *Systemeinstellungen → Bedienungshilfen* springt (`NSWorkspace.open` mit Deep-Link); Tracking kann erst starten, wenn Berechtigung erteilt ist |
+| Settings-Fenster | Kein eigenes Fenster — Ordner-Auswahl öffnet `NSOpenPanel` direkt aus dem Menüeintrag heraus |
 
 ## Offene Fragen
 
-1. **Berechtigungs-Onboarding** — Soll die App beim ersten Start aktiv durch die Accessibility-Berechtigung führen (mit Deep-Link in die Systemeinstellungen)?
-2. **Settings-Fenster** — Reicht ein einfaches Popover im Menubar-Menü, oder soll es ein eigenes Settings-Fenster geben?
+Alle wesentlichen Designentscheidungen sind getroffen. Der Plan ist bereit für die Implementierung.
